@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Detection with Grad-CAM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 20px;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8e9ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            font-size: 0.9rem;
+            color: #999;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .options-section {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .option-card {
+            flex: 1;
+            min-width: 200px;
+            max-width: 300px;
+            background: #f8f9ff;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .option-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .option-card.selected {
+            border-color: #667eea;
+            background: #e8e9ff;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .option-card input[type="checkbox"] {
+            display: none;
+        }
+
+        .option-label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .option-description {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .predict-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .predict-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .predict-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            margin-top: 40px;
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .prediction-result {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .prediction-label {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .prediction-confidence {
+            font-size: 1.3rem;
+            opacity: 0.95;
+        }
+
+        .visualizations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .viz-card {
+            background: #f8f9ff;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .viz-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .viz-image {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .viz-images {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .viz-figure {
+            margin: 0;
+            text-align: center;
+        }
+
+        .viz-caption {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .preview-section {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .options-section {
+                flex-direction: column;
+            }
+
+            .option-card {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌿 Plant Disease Detection</h1>
+            <p class="subtitle">Upload a plant image to detect diseases and visualize model attention using Grad-CAM</p>
+        </header>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">Click to upload or drag and drop</div>
+                    <div class="upload-subtext">JPEG or PNG (max 10MB)</div>
+                    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/jpg">
+                </div>
+            </div>
+
+            <div class="preview-section" id="previewSection" style="display: none;">
+                <img id="previewImage" class="preview-image" alt="Preview">
+            </div>
+
+            <div class="options-section">
+                <div class="option-card selected" id="gradcamCard">
+                    <input type="checkbox" id="gradcamCheck" checked>
+                    <label class="option-label">Grad-CAM</label>
+                    <p class="option-description">Standard gradient-based visualization showing important regions</p>
+                </div>
+
+                <div class="option-card selected" id="gradcamPlusPlusCard">
+                    <input type="checkbox" id="gradcamPlusPlusCheck" checked>
+                    <label class="option-label">Grad-CAM++</label>
+                    <p class="option-description">Enhanced visualization with better localization using second-order gradients</p>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <button class="predict-btn" id="predictBtn" disabled>Analyze Image</button>
+            </div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="prediction-result" id="predictionResult"></div>
+                <div class="visualizations" id="visualizations"></div>
+            </div>
+
+            <div class="loading" id="loadingSection" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing image and generating visualizations...</p>
+            </div>
+
+            <div class="error" id="errorSection" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const predictBtn = document.getElementById('predictBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const loadingSection = document.getElementById('loadingSection');
+        const errorSection = document.getElementById('errorSection');
+        const previewSection = document.getElementById('previewSection');
+        const previewImage = document.getElementById('previewImage');
+        const gradcamCard = document.getElementById('gradcamCard');
+        const gradcamPlusPlusCard = document.getElementById('gradcamPlusPlusCard');
+        const gradcamCheck = document.getElementById('gradcamCheck');
+        const gradcamPlusPlusCheck = document.getElementById('gradcamPlusPlusCheck');
+
+        let selectedFile = null;
+
+        // Upload area click
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // File input change
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        // Option card selection
+        gradcamCard.addEventListener('click', () => {
+            gradcamCheck.checked = !gradcamCheck.checked;
+            gradcamCard.classList.toggle('selected', gradcamCheck.checked);
+        });
+
+        gradcamPlusPlusCard.addEventListener('click', () => {
+            gradcamPlusPlusCheck.checked = !gradcamPlusPlusCheck.checked;
+            gradcamPlusPlusCard.classList.toggle('selected', gradcamPlusPlusCheck.checked);
+        });
+
+        // Predict button
+        predictBtn.addEventListener('click', analyzeImage);
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                if (file.size > 10 * 1024 * 1024) {
+                    showError('File size must be less than 10MB');
+                    return;
+                }
+
+                if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                    showError('Please upload a JPEG or PNG image');
+                    return;
+                }
+
+                selectedFile = file;
+                predictBtn.disabled = false;
+
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewSection.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+
+                // Hide previous results
+                resultsSection.classList.remove('show');
+                errorSection.style.display = 'none';
+            }
+        }
+
+        async function analyzeImage() {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            // Build URL with query parameters for gradcam options
+            const params = new URLSearchParams();
+            params.append('gradcam', gradcamCheck.checked ? 'true' : 'false');
+            params.append('gradcam_plus_plus', gradcamPlusPlusCheck.checked ? 'true' : 'false');
+
+            loadingSection.style.display = 'block';
+            resultsSection.classList.remove('show');
+            errorSection.style.display = 'none';
+            predictBtn.disabled = true;
+
+            try {
+                console.log('Sending request with params:', params.toString());
+                const response = await fetch(`/predict?${params.toString()}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to analyze image');
+                }
+
+                const data = await response.json();
+                console.log('Response data:', data);
+                console.log('Has gradcam:', !!data.gradcam);
+                console.log('Has gradcam++:', !!(data.gradcam_plus_plus || data['gradcam++']));
+                displayResults(data);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loadingSection.style.display = 'none';
+                predictBtn.disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            const predictionResult = document.getElementById('predictionResult');
+            const visualizations = document.getElementById('visualizations');
+
+            // Format label (replace underscores with spaces)
+            const formattedLabel = data.label.replace(/_/g, ' ' );
+            const confidence = (data.confidence * 100).toFixed(2);
+
+            predictionResult.innerHTML = `
+                <div class="prediction-label">${formattedLabel}</div>
+                <div class="prediction-confidence">Confidence: ${confidence}%</div>
+            `;
+
+            // Clear previous visualizations
+            visualizations.innerHTML = '';
+
+            const originalImageSrc = data.original_image
+                ? `data:image/png;base64,${data.original_image}`
+                : (previewImage.src || '');
+
+            const originalFigure = originalImageSrc
+                ? `
+                    <figure class="viz-figure">
+                        <img src="${originalImageSrc}" class="viz-image" alt="Original">
+                        <figcaption class="viz-caption">Original Image</figcaption>
+                    </figure>
+                `
+                : '';
+
+            function buildVizCard(title, overlaySrc, overlayLabel) {
+                const card = document.createElement('div');
+                card.className = 'viz-card';
+                card.innerHTML = `
+                    <div class="viz-title">${title}</div>
+                    <div class="viz-images">
+                        ${originalFigure}
+                        <figure class="viz-figure">
+                            <img src="${overlaySrc}" class="viz-image" alt="${overlayLabel}">
+                            <figcaption class="viz-caption">${overlayLabel}</figcaption>
+                        </figure>
+                    </div>
+                `;
+                return card;
+            }
+
+            // Add Grad-CAM visualization
+            if (data.gradcam) {
+                console.log('Adding Grad-CAM visualization');
+                const gradcamCard = buildVizCard('Grad-CAM Visualization', `data:image/png;base64,${data.gradcam}`, 'Grad-CAM');
+                visualizations.appendChild(gradcamCard);
+            } else if (gradcamCheck.checked) {
+                console.log('Grad-CAM was requested but not returned');
+            }
+
+            // Add Grad-CAM++ visualization
+            const gradcamPlusPlus = data.gradcam_plus_plus || data['gradcam++'];
+            if (gradcamPlusPlus) {
+                console.log('Adding Grad-CAM++ visualization');
+                const gradcamPlusPlusCard = buildVizCard('Grad-CAM++ Visualization', `data:image/png;base64,${gradcamPlusPlus}`, 'Grad-CAM++');
+                visualizations.appendChild(gradcamPlusPlusCard);
+            } else if (gradcamPlusPlusCheck.checked) {
+                console.log('Grad-CAM++ was requested but not returned');
+            }
+
+            resultsSection.classList.add('show');
+        }
+
+        function showError(message) {
+            errorSection.textContent = message;
+            errorSection.style.display = 'block';
+            setTimeout(() => {
+                errorSection.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
