@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.model import get_model
@@ -7,6 +7,7 @@ from app.preprocessing import preprocess_image, preprocess_image_for_display
 from app.gradcam import generate_gradcam, image_to_base64
 
 import numpy as np
+from pathlib import Path
 
 app = FastAPI(title="Leaf Disease API")
 
@@ -41,6 +42,9 @@ CLASS_NAMES = [
 
 @app.get("/")
 def root():
+    index_path = Path("static") / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path, media_type="text/html")
     return {"message": "Leaf Disease Classification API", "docs": "/docs"}
 
 @app.get("/health")

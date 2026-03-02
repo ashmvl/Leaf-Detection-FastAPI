@@ -23,12 +23,16 @@ def make_gradcam_heatmap(img_array: np.ndarray, model, last_conv_layer_name: str
     Returns:
         Heatmap as numpy array
     """
+    model_output = model.outputs[0] if isinstance(model.outputs, (list, tuple)) else model.outputs
     grad_model = tf.keras.models.Model(
-        model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
+        model.inputs, [model.get_layer(last_conv_layer_name).output, model_output]
     )
 
     with tf.GradientTape() as tape:
-        last_conv_layer_output, predictions = grad_model(img_array)
+        model_inputs = [img_array] if isinstance(model.inputs, (list, tuple)) and len(model.inputs) == 1 else img_array
+        last_conv_layer_output, predictions = grad_model(model_inputs)
+        if isinstance(predictions, (list, tuple)):
+            predictions = predictions[0]
         pred_index = tf.argmax(predictions[0])
         class_channel = predictions[:, pred_index]
 
@@ -55,12 +59,16 @@ def make_gradcam_plus_plus_heatmap(img_array: np.ndarray, model, last_conv_layer
     Returns:
         Heatmap as numpy array
     """
+    model_output = model.outputs[0] if isinstance(model.outputs, (list, tuple)) else model.outputs
     grad_model = tf.keras.models.Model(
-        model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
+        model.inputs, [model.get_layer(last_conv_layer_name).output, model_output]
     )
 
     with tf.GradientTape(persistent=True) as tape:
-        last_conv_layer_output, predictions = grad_model(img_array)
+        model_inputs = [img_array] if isinstance(model.inputs, (list, tuple)) and len(model.inputs) == 1 else img_array
+        last_conv_layer_output, predictions = grad_model(model_inputs)
+        if isinstance(predictions, (list, tuple)):
+            predictions = predictions[0]
         pred_index = tf.argmax(predictions[0])
         class_channel = predictions[:, pred_index]
 

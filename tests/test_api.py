@@ -39,12 +39,11 @@ class TestRootEndpoint:
     """Test the root endpoint."""
 
     def test_root(self):
-        """Test that root endpoint returns welcome message."""
+        """Test that root endpoint serves the frontend page."""
         response = client.get("/")
         assert response.status_code == 200
-        data = response.json()
-        assert "message" in data
-        assert "docs" in data
+        assert "text/html" in response.headers.get("content-type", "")
+        assert "<html" in response.text.lower()
 
 
 class TestPredictEndpoint:
